@@ -1,0 +1,19 @@
+# C++ and CMake
+build/
+bin/
+libs
+_deps
+CMakeFiles
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# OS X
+.DS_Store
+.Spotlight-V100
+.Trashes
+._*
+
+# VSCode
+.vscode

@@ -39,12 +39,9 @@ For VSCode, ``c_cpp_properties.json`` should have something like the following
 
 ```json
 {
-...
 "configurations": [
         {
-            ...
             "includePath": [
-                ...
                 "${workspaceFolder}/_deps/googletest-src/googletest/include"
             ],
         }

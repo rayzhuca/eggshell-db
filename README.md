@@ -1,6 +1,6 @@
 # ModelDB
 
-Relational atabase model built in C++, written as a learning project.
+Relational database model built in C++, written as a learning project.
 We plan to add indexing, range queries, atomic transactions, concurrency, and custom parser, with everything built from scratch.
 
 ## Usage

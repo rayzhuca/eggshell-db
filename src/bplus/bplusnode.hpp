@@ -13,15 +13,15 @@ class BPlusNode {
     bool is_leaf;
 };
 
-template <class T>
-class BPlusInternalNode : BPlusNode<T> {
+template <class K, class V>
+class BPlusInternalNode : BPlusNode<K, V> {
    public:
     uint16_t children_size;
     std::unique_ptr<BPlusNode*> children;
 };
 
-template <class T>
-class BPlusLeafNode : public BPlusNode {
+template <class K, class V>
+class BPlusLeafNode : public BPlusNode<K, V> {
    public:
     std::array<T> values;
 };

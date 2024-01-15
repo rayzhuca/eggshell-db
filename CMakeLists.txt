@@ -7,16 +7,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # add library
-file(GLOB MODELDB_SRC "src/*.cpp" "src/*.hpp")
-file(GLOB MODELDB_INCLUDE "include/*.hpp")
+file(GLOB_RECURSE MODELDB_SRC "src/*.cpp" "src/*.hpp")
+file(GLOB_RECURSE MODELDB_INCLUDE "include/*.hpp")
 add_library(modeldb SHARED ${MODELDB_SRC} ${MODELDB_INCLUDE}) 
 
 # set include directories
 target_include_directories(modeldb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/modeldb)
+target_include_directories(modeldb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(modeldb PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+# add executable (repl)
+add_executable(repl "src/repl.cpp")
 
 # testing
 enable_testing()

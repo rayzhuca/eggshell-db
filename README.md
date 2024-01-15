@@ -13,6 +13,12 @@ To build, run
 cmake --build build
 ```
 
+To run the REPL,
+
+```zsh
+build/repl
+```
+
 ## Tests
 
 ModelDB uses [Google Test](https://github.com/google/googletest), which is simple to configure and run.

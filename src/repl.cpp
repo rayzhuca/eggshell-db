@@ -21,9 +21,10 @@ int main() {
         print_prompt();
         read_input(input);
         if (input == ".exit") {
-            exit(EXIT_SUCCESS);
+            break;
         } else {
             std::cout << "Unrecognized command \'" << input << "\'.\n";
         }
     }
+    return EXIT_SUCCESS;
 }

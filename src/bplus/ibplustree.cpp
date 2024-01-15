@@ -1,5 +1,5 @@
 #include "bplus/ibplustree.hpp"
 
-#include "bplusnode.hpp"
+#include "bplus/bplusnode.hpp"
 
 // resources: https://shachaf.net/w/b-trees

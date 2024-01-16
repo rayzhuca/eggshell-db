@@ -21,16 +21,52 @@ MetaCmdResult do_meta_cmd(std::string input) {
     }
 }
 
-enum class CmdPrepareResult { success, unrecognized };
+enum class CmdPrepareResult { success, unrecognized, syntax_error };
 
 enum class StatementType { insert, select };
+
+struct Row {
+    static const size_t COLUMN_USERNAME_SIZE = 32;
+    static const size_t COLUMN_EMAIL_SIZE = 255;
+    static const uint32_t ID_SIZE = sizeof(uint32_t);
+    static const uint32_t USERNAME_SIZE =
+        sizeof(char) * (COLUMN_USERNAME_SIZE + 1);
+    static const uint32_t EMAIL_SIZE = sizeof(char) * (COLUMN_EMAIL_SIZE + 1);
+
+    static const uint32_t ID_OFFSET = 0;
+    static const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
+    static const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
+    static const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+
+    uint32_t id;
+    char username[COLUMN_USERNAME_SIZE + 1];
+    char email[COLUMN_EMAIL_SIZE + 1];
+
+    void serialize(void* destination) {
+        std::memcpy(destination + ID_OFFSET, &id, ID_SIZE);
+        std::memcpy(destination + USERNAME_OFFSET, &username, USERNAME_SIZE);
+        std::memcpy(destination + EMAIL_OFFSET, &email, EMAIL_SIZE);
+    }
+
+    void deserialize(void* source) {
+        std::memcpy(&id, source + ID_OFFSET, ID_SIZE);
+        std::memcpy(&username, source + USERNAME_OFFSET, USERNAME_SIZE);
+        std::memcpy(&email, source + EMAIL_OFFSET, EMAIL_SIZE);
+    }
+};
 struct Statement {
     StatementType type;
+    Row row_to_insert;
 };
 
 CmdPrepareResult prepare_statement(std::string input, Statement& statement) {
     if (input.starts_with("insert")) {
         statement.type = StatementType::insert;
+        std::cin >> statement.row_to_insert.id >>
+            statement.row_to_insert.username >> statement.row_to_insert.email;
+        if (std::cin.fail()) {
+            return CmdPrepareResult::syntax_error;
+        }
         return CmdPrepareResult::success;
     }
     if (input.starts_with("select")) {
@@ -44,7 +80,6 @@ void execute_statement(const Statement& statement) {
     switch (statement.type) {
         case (StatementType::insert):
             std::cout << "insert placeholder\n";
-            break;
         case (StatementType::select):
             std::cout << "select placeholder\n";
             break;

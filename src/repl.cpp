@@ -36,7 +36,7 @@ struct Row {
     static const uint32_t ID_OFFSET = 0;
     static const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
     static const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
-    static const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+    static const uint32_t SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
 
     uint32_t id;
     char username[COLUMN_USERNAME_SIZE + 1];
@@ -53,6 +53,16 @@ struct Row {
         std::memcpy(&username, source + USERNAME_OFFSET, USERNAME_SIZE);
         std::memcpy(&email, source + EMAIL_OFFSET, EMAIL_SIZE);
     }
+};
+
+struct Table {
+    const static size_t PAGE_SIZE = 4096;
+    const static size_t MAX_PAGES = 100;
+    const static uint32_t ROWS_PER_PAGE = PAGE_SIZE / Row::SIZE;
+    const static uint32_t MAX_ROWS = ROWS_PER_PAGE * MAX_PAGES;
+
+    uint32_t num_rows;
+    void* pages[MAX_PAGES];
 };
 struct Statement {
     StatementType type;

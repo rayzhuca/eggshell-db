@@ -95,56 +95,56 @@ struct Table {
 struct Statement {
     StatementType type;
     Row row_to_insert;
-};
 
-CmdPrepareResult prepare_statement(std::string input, Statement& statement) {
-    if (input.starts_with("insert")) {
-        statement.type = StatementType::insert;
-        std::stringstream stream(input);
-        std::string w;
-        stream >> w >> statement.row_to_insert.id >>
-            statement.row_to_insert.username >> statement.row_to_insert.email;
-        if (std::cin.fail()) {
-            return CmdPrepareResult::syntax_error;
+    CmdPrepareResult prepare(std::string input) {
+        if (input.starts_with("insert")) {
+            type = StatementType::insert;
+            std::stringstream stream(input);
+            std::string w;
+            stream >> w >> row_to_insert.id >> row_to_insert.username >>
+                row_to_insert.email;
+            if (std::cin.fail()) {
+                return CmdPrepareResult::syntax_error;
+            }
+            return CmdPrepareResult::success;
         }
-        return CmdPrepareResult::success;
-    }
-    if (input.starts_with("select")) {
-        statement.type = StatementType::select;
-        return CmdPrepareResult::success;
-    }
-    return CmdPrepareResult::unrecognized;
-}
-
-ExecuteResult execute_insert(const Statement& statement, Table& table) {
-    if (table.num_rows >= Table::MAX_ROWS) {
-        return ExecuteResult::table_full;
+        if (input.starts_with("select")) {
+            type = StatementType::select;
+            return CmdPrepareResult::success;
+        }
+        return CmdPrepareResult::unrecognized;
     }
 
-    const Row* row_to_insert = &(statement.row_to_insert);
-    row_to_insert->serialize(table.row_slot(table.num_rows));
-    ++table.num_rows;
+    ExecuteResult execute_insert(Table& table) {
+        if (table.num_rows >= Table::MAX_ROWS) {
+            return ExecuteResult::table_full;
+        }
 
-    return ExecuteResult::success;
-}
+        row_to_insert.serialize(table.row_slot(table.num_rows));
+        ++table.num_rows;
 
-ExecuteResult execute_select(const Statement& statement, Table& table) {
-    Row row;
-    for (uint32_t i = 0; i < table.num_rows; i++) {
-        row.deserialize(table.row_slot(i));
-        std::cout << row.id << ' ' << row.username << ' ' << row.email << '\n';
+        return ExecuteResult::success;
     }
-    return ExecuteResult::success;
-}
 
-ExecuteResult execute_statement(const Statement& statement, Table& table) {
-    switch (statement.type) {
-        case (StatementType::insert):
-            return execute_insert(statement, table);
-        case (StatementType::select):
-            return execute_select(statement, table);
+    ExecuteResult execute_select(Table& table) const {
+        Row row;
+        for (uint32_t i = 0; i < table.num_rows; i++) {
+            row.deserialize(table.row_slot(i));
+            std::cout << row.id << ' ' << row.username << ' ' << row.email
+                      << '\n';
+        }
+        return ExecuteResult::success;
     }
-}
+
+    ExecuteResult execute(Table& table) {
+        switch (type) {
+            case (StatementType::insert):
+                return execute_insert(table);
+            case (StatementType::select):
+                return execute_select(table);
+        }
+    }
+};
 
 int main() {
     Table table;
@@ -162,7 +162,7 @@ int main() {
             }
         } else {
             Statement statement;
-            switch (prepare_statement(input, statement)) {
+            switch (statement.prepare(input)) {
                 case (CmdPrepareResult::success):
                     break;
                 case (CmdPrepareResult::syntax_error):
@@ -173,7 +173,7 @@ int main() {
                               << "\'.\n";
                     continue;
             }
-            switch (execute_statement(statement, table)) {
+            switch (statement.execute(table)) {
                 case (ExecuteResult::success):
                     printf("Executed.\n");
                     break;

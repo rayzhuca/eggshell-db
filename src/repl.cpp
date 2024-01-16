@@ -22,7 +22,12 @@ MetaCmdResult do_meta_cmd(std::string input) {
     }
 }
 
-enum class CmdPrepareResult { success, unrecognized, syntax_error };
+enum class CmdPrepareResult {
+    success,
+    unrecognized,
+    syntax_error,
+    string_too_long
+};
 
 enum class StatementType { insert, select };
 
@@ -100,12 +105,21 @@ struct Statement {
         if (input.starts_with("insert")) {
             type = StatementType::insert;
             std::stringstream stream(input);
-            std::string w;
-            stream >> w >> row_to_insert.id >> row_to_insert.username >>
-                row_to_insert.email;
+            uint32_t id;
+            std::string w, username, email;
+            stream >> w >> id >> username >> email;
+            if (username.size() > Row::COLUMN_USERNAME_SIZE ||
+                email.size() > Row::COLUMN_EMAIL_SIZE) {
+                return CmdPrepareResult::string_too_long;
+            }
             if (std::cin.fail()) {
                 return CmdPrepareResult::syntax_error;
             }
+            row_to_insert.id = id;
+            strncpy(row_to_insert.username, username.c_str(),
+                    sizeof(row_to_insert.username));
+            strncpy(row_to_insert.email, email.c_str(),
+                    sizeof(row_to_insert.email));
             return CmdPrepareResult::success;
         }
         if (input.starts_with("select")) {
@@ -165,8 +179,11 @@ int main() {
             switch (statement.prepare(input)) {
                 case (CmdPrepareResult::success):
                     break;
+                case (CmdPrepareResult::string_too_long):
+                    std::cout << "String is too long.\n";
+                    continue;
                 case (CmdPrepareResult::syntax_error):
-                    printf("Syntax error. Could not parse statement.\n");
+                    std::cout << "Syntax error. Could not parse statement.\n";
                     continue;
                 case (CmdPrepareResult::unrecognized):
                     std::cout << "Unrecognized keyword at start of \'" << input

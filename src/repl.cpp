@@ -192,10 +192,10 @@ int main() {
             }
             switch (statement.execute(table)) {
                 case (ExecuteResult::success):
-                    printf("Executed.\n");
+                    std::cout << "Executed.\n";
                     break;
                 case (ExecuteResult::table_full):
-                    printf("Error: Table full.\n");
+                    std::cout << "Error: Table full.\n";
                     break;
             }
         }

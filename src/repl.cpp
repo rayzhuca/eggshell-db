@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -26,7 +27,8 @@ enum class CmdPrepareResult {
     success,
     unrecognized,
     syntax_error,
-    string_too_long
+    string_too_long,
+    id_out_of_range
 };
 
 enum class StatementType { insert, select };
@@ -105,12 +107,15 @@ struct Statement {
         if (input.starts_with("insert")) {
             type = StatementType::insert;
             std::stringstream stream(input);
-            uint32_t id;
+            int64_t id;
             std::string w, username, email;
             stream >> w >> id >> username >> email;
             if (username.size() > Row::COLUMN_USERNAME_SIZE ||
                 email.size() > Row::COLUMN_EMAIL_SIZE) {
                 return CmdPrepareResult::string_too_long;
+            }
+            if (id < 0 || id > std::numeric_limits<uint32_t>::max()) {
+                return CmdPrepareResult::id_out_of_range;
             }
             if (std::cin.fail()) {
                 return CmdPrepareResult::syntax_error;
@@ -179,6 +184,9 @@ int main() {
             switch (statement.prepare(input)) {
                 case (CmdPrepareResult::success):
                     break;
+                case (CmdPrepareResult::id_out_of_range):
+                    std::cout << "Id out of range\n";
+                    continue;
                 case (CmdPrepareResult::string_too_long):
                     std::cout << "String is too long.\n";
                     continue;

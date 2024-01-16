@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 void read_input(std::string& str) {
@@ -25,6 +26,8 @@ enum class CmdPrepareResult { success, unrecognized, syntax_error };
 
 enum class StatementType { insert, select };
 
+enum class ExecuteResult { success, table_full };
+
 struct Row {
     static const size_t COLUMN_USERNAME_SIZE = 32;
     static const size_t COLUMN_EMAIL_SIZE = 255;
@@ -42,16 +45,17 @@ struct Row {
     char username[COLUMN_USERNAME_SIZE + 1];
     char email[COLUMN_EMAIL_SIZE + 1];
 
-    void serialize(void* destination) {
-        std::memcpy(destination + ID_OFFSET, &id, ID_SIZE);
-        std::memcpy(destination + USERNAME_OFFSET, &username, USERNAME_SIZE);
-        std::memcpy(destination + EMAIL_OFFSET, &email, EMAIL_SIZE);
+    void serialize(void* destination) const {
+        std::memcpy((char*)destination + ID_OFFSET, &id, ID_SIZE);
+        std::memcpy((char*)destination + USERNAME_OFFSET, &username,
+                    USERNAME_SIZE);
+        std::memcpy((char*)destination + EMAIL_OFFSET, &email, EMAIL_SIZE);
     }
 
-    void deserialize(void* source) {
-        std::memcpy(&id, source + ID_OFFSET, ID_SIZE);
-        std::memcpy(&username, source + USERNAME_OFFSET, USERNAME_SIZE);
-        std::memcpy(&email, source + EMAIL_OFFSET, EMAIL_SIZE);
+    void deserialize(const void* source) {
+        std::memcpy(&id, (char*)source + ID_OFFSET, ID_SIZE);
+        std::memcpy(&username, (char*)source + USERNAME_OFFSET, USERNAME_SIZE);
+        std::memcpy(&email, (char*)source + EMAIL_OFFSET, EMAIL_SIZE);
     }
 };
 
@@ -63,6 +67,30 @@ struct Table {
 
     uint32_t num_rows;
     void* pages[MAX_PAGES];
+
+    Table() {
+        for (size_t i = 0; i < MAX_PAGES; ++i) {
+            pages[i] = nullptr;
+        }
+    }
+
+    ~Table() {
+        for (int i = 0; pages[i] != nullptr; ++i) {
+            free(pages[i]);
+        }
+    }
+
+    void* row_slot(uint32_t row_num) {
+        uint32_t page_num = row_num / ROWS_PER_PAGE;
+        void* page = pages[page_num];
+        if (page == nullptr) {
+            // Allocate memory only when we try to access page
+            page = pages[page_num] = new uint8_t[PAGE_SIZE];
+        }
+        uint32_t row_offset = row_num % ROWS_PER_PAGE;
+        uint32_t byte_offset = row_offset * Row::SIZE;
+        return (char*)page + byte_offset;
+    }
 };
 struct Statement {
     StatementType type;
@@ -72,7 +100,9 @@ struct Statement {
 CmdPrepareResult prepare_statement(std::string input, Statement& statement) {
     if (input.starts_with("insert")) {
         statement.type = StatementType::insert;
-        std::cin >> statement.row_to_insert.id >>
+        std::stringstream stream(input);
+        std::string w;
+        stream >> w >> statement.row_to_insert.id >>
             statement.row_to_insert.username >> statement.row_to_insert.email;
         if (std::cin.fail()) {
             return CmdPrepareResult::syntax_error;
@@ -86,17 +116,38 @@ CmdPrepareResult prepare_statement(std::string input, Statement& statement) {
     return CmdPrepareResult::unrecognized;
 }
 
-void execute_statement(const Statement& statement) {
+ExecuteResult execute_insert(const Statement& statement, Table& table) {
+    if (table.num_rows >= Table::MAX_ROWS) {
+        return ExecuteResult::table_full;
+    }
+
+    const Row* row_to_insert = &(statement.row_to_insert);
+    row_to_insert->serialize(table.row_slot(table.num_rows));
+    ++table.num_rows;
+
+    return ExecuteResult::success;
+}
+
+ExecuteResult execute_select(const Statement& statement, Table& table) {
+    Row row;
+    for (uint32_t i = 0; i < table.num_rows; i++) {
+        row.deserialize(table.row_slot(i));
+        std::cout << row.id << ' ' << row.username << ' ' << row.email << '\n';
+    }
+    return ExecuteResult::success;
+}
+
+ExecuteResult execute_statement(const Statement& statement, Table& table) {
     switch (statement.type) {
         case (StatementType::insert):
-            std::cout << "insert placeholder\n";
+            return execute_insert(statement, table);
         case (StatementType::select):
-            std::cout << "select placeholder\n";
-            break;
+            return execute_select(statement, table);
     }
 }
 
 int main() {
+    Table table;
     std::string input;
     while (true) {
         std::cout << "modeldb > ";
@@ -114,14 +165,22 @@ int main() {
             switch (prepare_statement(input, statement)) {
                 case (CmdPrepareResult::success):
                     break;
+                case (CmdPrepareResult::syntax_error):
+                    printf("Syntax error. Could not parse statement.\n");
+                    continue;
                 case (CmdPrepareResult::unrecognized):
                     std::cout << "Unrecognized keyword at start of \'" << input
-                              << "\'\n";
+                              << "\'.\n";
                     continue;
             }
-
-            execute_statement(statement);
-            std::cout << "Executed.\n";
+            switch (execute_statement(statement, table)) {
+                case (ExecuteResult::success):
+                    printf("Executed.\n");
+                    break;
+                case (ExecuteResult::table_full):
+                    printf("Error: Table full.\n");
+                    break;
+            }
         }
     }
     return EXIT_FAILURE;

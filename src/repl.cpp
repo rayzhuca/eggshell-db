@@ -1,17 +1,9 @@
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <sstream>
 #include <string>
-
-void read_input(std::string& str) {
-    try {
-        std::getline(std::cin, str);
-    } catch (std::ifstream::failure e) {
-        std::cout << "error reading input\n";
-        std::cout << e.what() << '\n';
-    }
-}
 
 enum class MetaCmdResult { success, unrecognized };
 
@@ -20,6 +12,18 @@ MetaCmdResult do_meta_cmd(std::string input) {
         exit(EXIT_SUCCESS);
     } else {
         return MetaCmdResult::unrecognized;
+    }
+}
+
+void read_input(std::string& str) {
+    try {
+        std::getline(std::cin, str);
+        if (std::cin.eof()) {
+            do_meta_cmd(".exit");
+        }
+    } catch (std::exception e) {
+        std::cout << "error reading input\n";
+        std::cout << e.what() << '\n';
     }
 }
 
@@ -66,6 +70,8 @@ struct Row {
     }
 };
 
+struct Cursor;
+
 struct Table {
     const static size_t PAGE_SIZE = 4096;
     const static size_t MAX_PAGES = 100;
@@ -74,6 +80,10 @@ struct Table {
 
     uint32_t num_rows;
     void* pages[MAX_PAGES];
+
+    Cursor start();
+
+    Cursor end();
 
     Table() {
         for (size_t i = 0; i < MAX_PAGES; ++i) {
@@ -86,19 +96,44 @@ struct Table {
             free(pages[i]);
         }
     }
+};
 
-    void* row_slot(uint32_t row_num) {
-        uint32_t page_num = row_num / ROWS_PER_PAGE;
-        void* page = pages[page_num];
+struct Cursor {
+    Table& table;
+    uint32_t row_num;
+    bool end_of_table;
+
+    Cursor(Table& table, uint32_t row_num, bool end_of_table)
+        : table{table}, row_num{row_num}, end_of_table{end_of_table} {
+    }
+
+    void* value() {
+        uint32_t page_num = row_num / table.ROWS_PER_PAGE;
+        void* page = table.pages[page_num];
         if (page == nullptr) {
             // Allocate memory only when we try to access page
-            page = pages[page_num] = new uint8_t[PAGE_SIZE];
+            page = table.pages[page_num] = new int8_t[Table::PAGE_SIZE];
         }
-        uint32_t row_offset = row_num % ROWS_PER_PAGE;
+        uint32_t row_offset = row_num % Table::ROWS_PER_PAGE;
         uint32_t byte_offset = row_offset * Row::SIZE;
-        return (char*)page + byte_offset;
+        return (int8_t*)page + byte_offset;
+    }
+
+    void advance() {
+        row_num += 1;
+        if (row_num >= table.num_rows) {
+            end_of_table = true;
+        }
     }
 };
+
+Cursor Table::start() {
+    return Cursor{*this, 0, false};
+}
+
+Cursor Table::end() {
+    return Cursor{*this, num_rows, true};
+}
 struct Statement {
     StatementType type;
     Row row_to_insert;
@@ -139,7 +174,7 @@ struct Statement {
             return ExecuteResult::table_full;
         }
 
-        row_to_insert.serialize(table.row_slot(table.num_rows));
+        row_to_insert.serialize(table.end().value());
         ++table.num_rows;
 
         return ExecuteResult::success;
@@ -147,10 +182,12 @@ struct Statement {
 
     ExecuteResult execute_select(Table& table) const {
         Row row;
+        Cursor cursor = table.start();
         for (uint32_t i = 0; i < table.num_rows; i++) {
-            row.deserialize(table.row_slot(i));
+            row.deserialize(cursor.value());
             std::cout << row.id << ' ' << row.username << ' ' << row.email
                       << '\n';
+            cursor.advance();
         }
         return ExecuteResult::success;
     }

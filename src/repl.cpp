@@ -39,6 +39,61 @@ enum class StatementType { insert, select };
 
 enum class ExecuteResult { success, table_full };
 
+enum class NodeType { internal, leaf };
+
+namespace Node {
+
+const uint32_t NODE_TYPE_SIZE = sizeof(uint8_t);
+const uint32_t NODE_TYPE_OFFSET = 0;
+const uint32_t IS_ROOT_SIZE = sizeof(uint8_t);
+const uint32_t IS_ROOT_OFFSET = NODE_TYPE_SIZE;
+const uint32_t PARENT_POINTER_SIZE = sizeof(uint32_t);
+const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
+const uint8_t COMMON_NODE_HEADER_SIZE =
+    NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_SIZE;
+
+};  // namespace Node
+
+namespace LeafNode {
+
+const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
+const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = Node::COMMON_NODE_HEADER_SIZE;
+const uint32_t LEAF_NODE_HEADER_SIZE =
+    Node::COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
+
+const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
+const uint32_t LEAF_NODE_KEY_OFFSET = 0;
+const uint32_t LEAF_NODE_VALUE_SIZE = Row::SIZE;
+const uint32_t LEAF_NODE_VALUE_OFFSET =
+    LEAF_NODE_KEY_OFFSET + LEAF_NODE_KEY_SIZE;
+const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
+const uint32_t LEAF_NODE_SPACE_FOR_CELLS =
+    Table::PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
+const uint32_t LEAF_NODE_MAX_CELLS =
+    LEAF_NODE_SPACE_FOR_CELLS / LEAF_NODE_CELL_SIZE;
+
+uint32_t* num_cells(void* node) {
+    return (uint32_t*)node + LEAF_NODE_NUM_CELLS_OFFSET;
+}
+
+void* cell(void* node, uint32_t cell_num) {
+    return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
+}
+
+uint32_t* key(void* node, uint32_t cell_num) {
+    return (uint32_t*)cell(node, cell_num);
+}
+
+void* value(void* node, uint32_t cell_num) {
+    return cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
+}
+
+void init(void* node) {
+    *num_cells(node) = 0;
+}
+
+};  // namespace LeafNode
+
 struct Row {
     static const size_t COLUMN_USERNAME_SIZE = 32;
     static const size_t COLUMN_EMAIL_SIZE = 255;
@@ -134,6 +189,7 @@ Cursor Table::start() {
 Cursor Table::end() {
     return Cursor{*this, num_rows, true};
 }
+
 struct Statement {
     StatementType type;
     Row row_to_insert;

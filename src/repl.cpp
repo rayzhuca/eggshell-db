@@ -127,28 +127,130 @@ struct Row {
 
 struct Cursor;
 
+struct Pager {
+    std::fstream file;
+    uint32_t file_length;
+    void* pages[Table::MAX_PAGES];
+
+    Pager(std::string filename)
+        : file{filename, file.in | file.out | file.trunc} {
+        if (file.fail()) {
+            printf("Unable to open file\n");
+            std::exit(EXIT_FAILURE);
+        }
+
+        file.ignore(std::numeric_limits<std::streamsize>::max());
+        file_length = file.gcount();
+
+        for (uint32_t i = 0; i < Table::MAX_PAGES; i++) {
+            pages[i] = nullptr;
+        }
+    }
+
+    void* get(uint32_t page_num) {
+        if (page_num > Table::MAX_PAGES) {
+            std::cout << "Tried to fetch page number out of bounds." << page_num
+                      << " >= " << Table::MAX_PAGES << "\n";
+            exit(EXIT_FAILURE);
+        }
+
+        if (pages[page_num] == nullptr) {
+            // Cache miss. Allocate memory and load from file.
+            void* page = new char[Table::PAGE_SIZE];
+            uint32_t num_pages = file_length / Table::PAGE_SIZE;
+
+            // We might save a partial page at the end of the file
+            if (file_length % Table::PAGE_SIZE) {
+                num_pages += 1;
+            }
+
+            if (page_num <= num_pages) {
+                file.seekg(page_num * Table::PAGE_SIZE, file.beg);
+                file.read((char*)page, Table::PAGE_SIZE);
+                if (!file.good()) {
+                    std::cout << "Error reading file: " << strerror(errno)
+                              << "\n";
+                    exit(EXIT_FAILURE);
+                }
+            }
+            pages[page_num] = page;
+        }
+
+        return pages[page_num];
+    }
+
+    void flush(uint32_t page_num, uint32_t size) {
+        if (pages[page_num] == NULL) {
+            std::cout << "Tried to flush null page\n";
+            exit(EXIT_FAILURE);
+        }
+
+        file.seekg(page_num * Table::PAGE_SIZE, file.beg);
+
+        if (!file.good()) {
+            std::cout << "Error seeking: " << strerror(errno) << "\n";
+            exit(EXIT_FAILURE);
+        }
+
+        file.write(reinterpret_cast<char*>(pages[page_num]), size);
+
+        if (!file.good()) {
+            std::cout << "Error writing: " << errno << "\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+};
+
 struct Table {
     const static size_t PAGE_SIZE = 4096;
     const static size_t MAX_PAGES = 100;
     const static uint32_t ROWS_PER_PAGE = PAGE_SIZE / Row::SIZE;
     const static uint32_t MAX_ROWS = ROWS_PER_PAGE * MAX_PAGES;
 
+    Pager pager;
     uint32_t num_rows;
-    void* pages[MAX_PAGES];
 
     Cursor start();
 
     Cursor end();
 
-    Table() {
-        for (size_t i = 0; i < MAX_PAGES; ++i) {
-            pages[i] = nullptr;
-        }
+    Table(std::string filename)
+        : pager{filename}, num_rows{pager.file_length / Row::SIZE} {
     }
 
     ~Table() {
-        for (int i = 0; pages[i] != nullptr; ++i) {
-            free(pages[i]);
+        uint32_t num_full_pages = num_rows / ROWS_PER_PAGE;
+
+        for (uint32_t i = 0; i < num_full_pages; i++) {
+            if (pager.pages[i] == nullptr) continue;
+            pager.flush(i, PAGE_SIZE);
+            delete pager.pages[i];
+            pager.pages[i] = nullptr;
+        }
+
+        // There may be a partial page to write to the end of the file
+        // This should not be needed after we switch to a B-tree
+        uint32_t num_additional_rows = num_rows % ROWS_PER_PAGE;
+        if (num_additional_rows > 0) {
+            uint32_t page_num = num_full_pages;
+            if (pager.pages[page_num]) {
+                pager.flush(page_num, num_additional_rows * Row::SIZE);
+                delete pager.pages[page_num];
+                pager.pages[page_num] = nullptr;
+            }
+        }
+
+        pager.file.close();
+        if (pager.file.fail()) {
+            std::cout << "Error closing db file.\n";
+            exit(EXIT_FAILURE);
+        }
+        for (uint32_t i = 0; i < Table::MAX_PAGES; i++) {
+            void* page = pager.pages[i];
+            if (page) {
+                free(page);
+                pager.pages[i] = nullptr;
+            }
         }
     }
 };
@@ -164,11 +266,7 @@ struct Cursor {
 
     void* value() {
         uint32_t page_num = row_num / table.ROWS_PER_PAGE;
-        void* page = table.pages[page_num];
-        if (page == nullptr) {
-            // Allocate memory only when we try to access page
-            page = table.pages[page_num] = new int8_t[Table::PAGE_SIZE];
-        }
+        void* page = table.pager.get(page_num);
         uint32_t row_offset = row_num % Table::ROWS_PER_PAGE;
         uint32_t byte_offset = row_offset * Row::SIZE;
         return (int8_t*)page + byte_offset;
@@ -259,7 +357,7 @@ struct Statement {
 };
 
 int main() {
-    Table table;
+    Table table("test.db");
     std::string input;
     while (true) {
         std::cout << "modeldb > ";

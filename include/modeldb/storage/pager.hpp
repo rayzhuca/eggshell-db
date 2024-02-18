@@ -4,6 +4,8 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <set>
 #include <string>
 
 struct Pager {
@@ -14,6 +16,7 @@ struct Pager {
     uint32_t file_length;
     uint32_t num_pages;
     char* pages[MAX_PAGES];
+    std::map<size_t, char*> previous_pages;
 
     Pager(std::string filename);
 
@@ -22,4 +25,6 @@ struct Pager {
     uint32_t get_unused_page_num();
 
     void flush(uint32_t page_num);
+
+    void log_transaction(uint32_t page_num, std::fstream& file);
 };

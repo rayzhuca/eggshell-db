@@ -1,5 +1,7 @@
 #include "modeldb/storage/table.hpp"
 
+#include <fstream>
+
 #include "modeldb/storage/bplus/internalnode.hpp"
 #include "modeldb/storage/bplus/leafnode.hpp"
 #include "modeldb/storage/bplus/node.hpp"
@@ -11,6 +13,19 @@ Table::Table(std::string filename) : pager{filename}, root_page_num{0} {
         LeafNode::init(root_node);
         Node::set_node_root(root_node, true);
     }
+}
+
+bool Table::flush() {
+    std::fstream logfile{"temp.log",
+                         logfile.binary | logfile.trunc | logfile.out};
+    for (const auto& [key, value] : pager.previous_pages) {
+        pager.log_transaction(key, logfile);
+        pager.flush(key);
+    }
+    // if transaction finished, then we don't need log
+    // TODO: finish
+    pager.previous_pages.clear();
+    return false;
 }
 
 Table::~Table() {

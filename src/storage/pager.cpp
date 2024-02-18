@@ -54,6 +54,10 @@ char* Pager::get(uint32_t page_num) {
             num_pages = page_num + 1;
         }
     }
+
+    previous_pages[page_num] = new char[PAGE_SIZE];
+    memcpy(previous_pages[page_num], pages[page_num], PAGE_SIZE);
+
     return pages[page_num];
 }
 
@@ -66,7 +70,7 @@ uint32_t Pager::get_unused_page_num() {
 }
 
 void Pager::flush(uint32_t page_num) {
-    if (pages[page_num] == NULL) {
+    if (pages[page_num] == nullptr) {
         std::cout << "Tried to flush null page\n";
         exit(EXIT_FAILURE);
     }
@@ -79,6 +83,21 @@ void Pager::flush(uint32_t page_num) {
     }
 
     file.write(pages[page_num], PAGE_SIZE);
+
+    if (!file) {
+        std::cout << "Error writing: " << errno << "\n";
+        exit(EXIT_FAILURE);
+    }
+}
+
+void Pager::log_transaction(uint32_t page_num, std::fstream& file) {
+    if (pages[page_num] == nullptr) {
+        std::cout << "Tried to flush null page\n";
+        exit(EXIT_FAILURE);
+    }
+    file.write(pages[page_num], PAGE_SIZE);
+    char success[] = {1};
+    file.write(success, 1);
 
     if (!file) {
         std::cout << "Error writing: " << errno << "\n";

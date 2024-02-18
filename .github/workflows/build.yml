@@ -2,7 +2,7 @@ name: Set up
 run-name: CMake build test
 on: [push]
 jobs:
-    Explore-GitHub-Actions:
+    Build:
         runs-on: ubuntu-latest
         steps:
             - name: Check out repository code

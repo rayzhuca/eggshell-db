@@ -248,12 +248,11 @@ const uint32_t LEAF_NODE_LEFT_SPLIT_COUNT =
     (LEAF_NODE_MAX_CELLS + 1) - LEAF_NODE_RIGHT_SPLIT_COUNT;
 
 uint32_t* num_cells(char* node) {
-    return (uint32_t*)node + LEAF_NODE_NUM_CELLS_OFFSET;
+    return (uint32_t*)(node + LEAF_NODE_NUM_CELLS_OFFSET);
 }
 
-uint32_t* cell(char* node, uint32_t cell_num) {
-    return (uint32_t*)node + LEAF_NODE_HEADER_SIZE +
-           cell_num * LEAF_NODE_CELL_SIZE;
+char* cell(char* node, uint32_t cell_num) {
+    return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
 }
 
 uint32_t* key(char* node, uint32_t cell_num) {
@@ -261,7 +260,7 @@ uint32_t* key(char* node, uint32_t cell_num) {
 }
 
 char* value(char* node, uint32_t cell_num) {
-    return (char*)cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
+    return cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
 }
 
 void init(char* node) {
@@ -383,6 +382,35 @@ uint32_t* child(char* node, uint32_t child_num) {
 uint32_t* key(char* node, uint32_t key_num) {
     return (uint32_t*)(cell(node, key_num) + INTERNAL_NODE_CHILD_SIZE);
 }
+
+Cursor find(Table& table, uint32_t page_num, uint32_t key) {
+    char* node = table.pager.get(page_num);
+    uint32_t num_keys_val = *num_keys(node);
+
+    /* Binary search to find index of child to search */
+    uint32_t min_index = 0;
+    uint32_t max_index = num_keys_val; /* there is one more child than key */
+
+    while (min_index != max_index) {
+        uint32_t index = (min_index + max_index) / 2;
+        uint32_t key_to_right = *InternalNode::key(node, index);
+        if (key_to_right >= key) {
+            max_index = index;
+        } else {
+            min_index = index + 1;
+        }
+    }
+
+    uint32_t child_num = *child(node, min_index);
+    char* child = table.pager.get(child_num);
+    switch (Node::get_node_type(child)) {
+        case NodeType::leaf:
+            return LeafNode::find(table, child_num, key);
+        case NodeType::internal:
+            return find(table, child_num, key);
+    }
+}
+
 };  // namespace InternalNode
 
 uint32_t Node::get_node_max_key(char* node) {
@@ -475,8 +503,7 @@ Cursor Table::find(uint32_t key) {
     if (Node::get_node_type(root_node) == NodeType::leaf) {
         return LeafNode::find(*this, root_page_num, key);
     } else {
-        std::cout << "Need to implement searching an internal node\n";
-        exit(EXIT_FAILURE);
+        return InternalNode::find(*this, root_page_num, key);
     }
 }
 

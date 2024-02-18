@@ -190,8 +190,9 @@ uint32_t* num_cells(char* node) {
     return (uint32_t*)node + LEAF_NODE_NUM_CELLS_OFFSET;
 }
 
-char* cell(char* node, uint32_t cell_num) {
-    return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
+uint32_t* cell(char* node, uint32_t cell_num) {
+    return (uint32_t*)node + LEAF_NODE_HEADER_SIZE +
+           cell_num * LEAF_NODE_CELL_SIZE;
 }
 
 uint32_t* key(char* node, uint32_t cell_num) {

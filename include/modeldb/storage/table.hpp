@@ -19,6 +19,8 @@ class Table {
 
     ~Table();
 
+    bool flush();
+
     Cursor start();
 
     Cursor find(uint32_t key);

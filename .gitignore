@@ -25,3 +25,4 @@ tests/cstack.c
 tests/cstack
 tests/test.bin
 tests/test.db
+src/test.db

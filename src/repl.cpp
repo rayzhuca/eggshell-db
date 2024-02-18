@@ -29,7 +29,7 @@ enum class CmdPrepareResult {
 
 enum class StatementType { insert, select };
 
-enum class ExecuteResult { success, table_full };
+enum class ExecuteResult { success, table_full, duplicate_key };
 
 enum class NodeType { internal, leaf };
 
@@ -63,7 +63,23 @@ struct Row {
     }
 };
 
-struct Cursor;
+struct Table;
+
+struct Cursor {
+    Table& table;
+    uint32_t page_num;
+    uint32_t cell_num;
+    bool end_of_table;
+
+    Cursor(Table& table, uint32_t page_num, uint32_t cell_num,
+           bool end_of_table);
+
+    Cursor(Table&& table, uint32_t page_num, uint32_t cell_num,
+           bool end_of_table) = delete;
+
+    char* value();
+    void advance();
+};
 
 struct Pager {
     const static size_t PAGE_SIZE = 4096;
@@ -98,8 +114,8 @@ struct Pager {
 
     char* get(uint32_t page_num) {
         if (page_num > MAX_PAGES) {
-            std::cout << "Tried to fetch page number out of bounds." << page_num
-                      << " >= " << MAX_PAGES << "\n";
+            std::cout << "Tried to fetch page number out of bounds. "
+                      << page_num << " >= " << MAX_PAGES << "\n";
             exit(EXIT_FAILURE);
         }
 
@@ -166,6 +182,16 @@ const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
 const uint8_t COMMON_NODE_HEADER_SIZE =
     NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_SIZE;
 
+NodeType get_node_type(char* node) {
+    uint8_t value = *((uint8_t*)(node + NODE_TYPE_OFFSET));
+    return static_cast<NodeType>(value);
+}
+
+void set_node_type(char* node, NodeType type) {
+    uint8_t value = static_cast<uint8_t>(type);
+    *((uint8_t*)(node + NODE_TYPE_OFFSET)) = value;
+}
+
 };  // namespace Node
 
 namespace LeafNode {
@@ -204,10 +230,13 @@ char* value(char* node, uint32_t cell_num) {
 }
 
 void init(char* node) {
+    Node::set_node_type(node, NodeType::leaf);
     *num_cells(node) = 0;
 }
 
 void insert(const Cursor& cursor, uint32_t key, Row& value);
+
+Cursor find(Table& table, uint32_t page_num, uint32_t key);
 
 };  // namespace LeafNode
 
@@ -233,10 +262,6 @@ void print_leaf_node(char* node) {
 struct Table {
     Pager pager;
     uint32_t root_page_num;
-
-    Cursor start();
-
-    Cursor end();
 
     Table(std::string filename) : pager{filename}, root_page_num{0} {
         if (pager.num_pages == 0) {
@@ -267,48 +292,46 @@ struct Table {
             }
         }
     }
-};
 
-struct Cursor {
-    Table& table;
-    uint32_t page_num;
-    uint32_t cell_num;
-    bool end_of_table;
+    Cursor start();
 
-    Cursor(Table& table, uint32_t page_num, uint32_t cell_num,
-           bool end_of_table)
-        : table{table},
-          page_num{page_num},
-          cell_num{cell_num},
-          end_of_table{end_of_table} {
-    }
-    Cursor(Table&& table, uint32_t page_num, uint32_t cell_num,
-           bool end_of_table) = delete;
+    Cursor find(uint32_t key) {
+        char* root_node = pager.get(root_page_num);
 
-    char* value() {
-        char* page = table.pager.get(page_num);
-        return LeafNode::value(page, cell_num);
-    }
-
-    void advance() {
-        char* node = table.pager.get(page_num);
-        cell_num += 1;
-        if (cell_num >= *LeafNode::num_cells(node)) {
-            end_of_table = true;
+        if (Node::get_node_type(root_node) == NodeType::leaf) {
+            return LeafNode::find(*this, root_page_num, key);
+        } else {
+            std::cout << "Need to implement searching an internal node\n";
+            exit(EXIT_FAILURE);
         }
     }
 };
+
+Cursor::Cursor(Table& table, uint32_t page_num, uint32_t cell_num,
+               bool end_of_table)
+    : table{table},
+      page_num{page_num},
+      cell_num{cell_num},
+      end_of_table{end_of_table} {
+}
+
+char* Cursor::value() {
+    char* page = table.pager.get(page_num);
+    return LeafNode::value(page, cell_num);
+}
+
+void Cursor::advance() {
+    char* node = table.pager.get(page_num);
+    cell_num += 1;
+    if (cell_num >= *LeafNode::num_cells(node)) {
+        end_of_table = true;
+    }
+}
 
 Cursor Table::start() {
     char* root_node = pager.get(root_page_num);
     uint32_t num_cells = *LeafNode::num_cells(root_node);
     return Cursor{*this, root_page_num, 0, num_cells == 0};
-}
-
-Cursor Table::end() {
-    char* root_node = pager.get(root_page_num);
-    uint32_t num_cells = *LeafNode::num_cells(root_node);
-    return Cursor{*this, root_page_num, num_cells, true};
 }
 
 void LeafNode::insert(const Cursor& cursor, uint32_t key, Row& value) {
@@ -332,6 +355,33 @@ void LeafNode::insert(const Cursor& cursor, uint32_t key, Row& value) {
     *LeafNode::num_cells(node) += 1;
     *LeafNode::key(node, cursor.cell_num) = key;
     value.serialize(LeafNode::value(node, cursor.cell_num));
+}
+
+Cursor LeafNode::find(Table& table, uint32_t page_num, uint32_t key) {
+    char* node = table.pager.get(page_num);
+    uint32_t num_cells = *LeafNode::num_cells(node);
+
+    Cursor cursor{table, page_num, uint32_t(-1), false};
+
+    // Binary search
+    uint32_t min_index = 0;
+    uint32_t one_past_max_index = num_cells;
+    while (one_past_max_index != min_index) {
+        uint32_t index = (min_index + one_past_max_index) / 2;
+        uint32_t key_at_index = *LeafNode::key(node, index);
+        if (key == key_at_index) {
+            cursor.cell_num = index;
+            return cursor;
+        }
+        if (key < key_at_index) {
+            one_past_max_index = index;
+        } else {
+            min_index = index + 1;
+        }
+    }
+
+    cursor.cell_num = min_index;
+    return cursor;
 }
 
 struct Statement {
@@ -371,11 +421,21 @@ struct Statement {
 
     ExecuteResult execute_insert(Table& table) {
         char* node = table.pager.get(table.root_page_num);
-        if (*LeafNode::num_cells(node) >= LeafNode::LEAF_NODE_MAX_CELLS) {
+        uint32_t num_cells = *LeafNode::num_cells(node);
+        if (num_cells >= LeafNode::LEAF_NODE_MAX_CELLS) {
             return ExecuteResult::table_full;
         }
 
-        LeafNode::insert(table.start(), row_to_insert.id, row_to_insert);
+        uint32_t key_to_insert = row_to_insert.id;
+        Cursor cursor = table.find(key_to_insert);
+        if (cursor.cell_num < num_cells) {
+            uint32_t key_at_index = *LeafNode::key(node, cursor.cell_num);
+            if (key_at_index == key_to_insert) {
+                return ExecuteResult::duplicate_key;
+            }
+        }
+
+        LeafNode::insert(cursor, row_to_insert.id, row_to_insert);
 
         return ExecuteResult::success;
     }
@@ -464,6 +524,9 @@ int main(int argc, char* argv[]) {
             switch (statement.execute(table)) {
                 case (ExecuteResult::success):
                     std::cout << "Executed.\n";
+                    break;
+                case (ExecuteResult::duplicate_key):
+                    std::cout << "Error: Duplicate key.\n";
                     break;
                 case (ExecuteResult::table_full):
                     std::cout << "Error: Table full.\n";

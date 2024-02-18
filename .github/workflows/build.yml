@@ -1,0 +1,12 @@
+name: Set up
+run-name: CMake build test
+on: [push]
+jobs:
+    Explore-GitHub-Actions:
+        runs-on: ubuntu-latest
+        steps:
+            - run: cd ${{ github.workspace }}
+            - name: Initialize cmake project in ./build
+              uses: cmake -S . -B ./build
+            - name: Run cmake build
+            - run: cmake build --build

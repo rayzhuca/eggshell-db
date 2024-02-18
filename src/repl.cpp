@@ -5,11 +5,11 @@
 #include <sstream>
 #include <string>
 
-enum class MetaCmdResult { success, unrecognized };
+enum class MetaCmdResult { success, unrecognized, exit };
 
 MetaCmdResult do_meta_cmd(std::string input) {
     if (input == ".exit") {
-        exit(EXIT_SUCCESS);
+        return MetaCmdResult::exit;
     } else {
         return MetaCmdResult::unrecognized;
     }
@@ -19,7 +19,7 @@ void read_input(std::string& str) {
     try {
         std::getline(std::cin, str);
         if (std::cin.eof()) {
-            do_meta_cmd(".exit");
+            str = ".exit";
         }
     } catch (std::exception e) {
         std::cout << "error reading input\n";
@@ -40,6 +40,116 @@ enum class StatementType { insert, select };
 enum class ExecuteResult { success, table_full };
 
 enum class NodeType { internal, leaf };
+
+struct Row {
+    static const size_t COLUMN_USERNAME_SIZE = 32;
+    static const size_t COLUMN_EMAIL_SIZE = 255;
+    static const uint32_t ID_SIZE = sizeof(uint32_t);
+    static const uint32_t USERNAME_SIZE =
+        sizeof(char) * (COLUMN_USERNAME_SIZE + 1);
+    static const uint32_t EMAIL_SIZE = sizeof(char) * (COLUMN_EMAIL_SIZE + 1);
+
+    static const uint32_t ID_OFFSET = 0;
+    static const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
+    static const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
+    static const uint32_t SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+
+    uint32_t id;
+    char username[COLUMN_USERNAME_SIZE + 1];
+    char email[COLUMN_EMAIL_SIZE + 1];
+
+    void serialize(char* destination) const {
+        std::memcpy(destination + ID_OFFSET, &id, ID_SIZE);
+        std::memcpy(destination + USERNAME_OFFSET, &username, USERNAME_SIZE);
+        std::memcpy(destination + EMAIL_OFFSET, &email, EMAIL_SIZE);
+    }
+
+    void deserialize(const char* source) {
+        std::memcpy(&id, source + ID_OFFSET, ID_SIZE);
+        std::memcpy(&username, source + USERNAME_OFFSET, USERNAME_SIZE);
+        std::memcpy(&email, source + EMAIL_OFFSET, EMAIL_SIZE);
+    }
+};
+
+struct Cursor;
+
+struct Pager {
+    const static size_t PAGE_SIZE = 4096;
+    const static size_t MAX_PAGES = 100;
+
+    std::fstream file;
+    uint32_t file_length;
+    char* pages[MAX_PAGES];
+
+    Pager(std::string filename)
+        : file{filename, file.in | file.out | file.binary} {
+        if (file.fail()) {
+            printf("Unable to open file\n");
+            std::exit(EXIT_FAILURE);
+        }
+
+        file.seekg(0, file.end);
+        file_length = file.tellg();
+
+        for (uint32_t i = 0; i < MAX_PAGES; i++) {
+            pages[i] = nullptr;
+        }
+    }
+
+    char* get(uint32_t page_num) {
+        if (page_num > MAX_PAGES) {
+            std::cout << "Tried to fetch page number out of bounds." << page_num
+                      << " >= " << MAX_PAGES << "\n";
+            exit(EXIT_FAILURE);
+        }
+
+        if (pages[page_num] == nullptr) {
+            // Cache miss. Allocate memory and load from file.
+            char* page = new char[PAGE_SIZE];
+            uint32_t num_pages = file_length / PAGE_SIZE;
+
+            // We might save a partial page at the end of the file
+            if (file_length % PAGE_SIZE) {
+                num_pages += 1;
+            }
+            if (page_num <= num_pages) {
+                file.clear();
+                file.seekg(page_num * PAGE_SIZE, file.beg);
+                file.clear();
+                file.read(page, PAGE_SIZE);
+                file.clear();
+                if (!file) {
+                    std::cout << "Error reading file: " << strerror(errno)
+                              << "\n";
+                    exit(EXIT_FAILURE);
+                }
+            }
+            pages[page_num] = page;
+        }
+        return pages[page_num];
+    }
+
+    void flush(uint32_t page_num, uint32_t size) {
+        if (pages[page_num] == NULL) {
+            std::cout << "Tried to flush null page\n";
+            exit(EXIT_FAILURE);
+        }
+        file.seekg(page_num * PAGE_SIZE, file.beg);
+        file.clear();
+
+        if (!file) {
+            std::cout << "Error seeking: " << strerror(errno) << "\n";
+            exit(EXIT_FAILURE);
+        }
+
+        file.write(pages[page_num], size);
+
+        if (!file) {
+            std::cout << "Error writing: " << errno << "\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+};
 
 namespace Node {
 
@@ -68,144 +178,35 @@ const uint32_t LEAF_NODE_VALUE_OFFSET =
     LEAF_NODE_KEY_OFFSET + LEAF_NODE_KEY_SIZE;
 const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
 const uint32_t LEAF_NODE_SPACE_FOR_CELLS =
-    Table::PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
+    Pager::PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
 const uint32_t LEAF_NODE_MAX_CELLS =
     LEAF_NODE_SPACE_FOR_CELLS / LEAF_NODE_CELL_SIZE;
 
-uint32_t* num_cells(void* node) {
+uint32_t* num_cells(char* node) {
     return (uint32_t*)node + LEAF_NODE_NUM_CELLS_OFFSET;
 }
 
-void* cell(void* node, uint32_t cell_num) {
+char* cell(char* node, uint32_t cell_num) {
     return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
 }
 
-uint32_t* key(void* node, uint32_t cell_num) {
+uint32_t* key(char* node, uint32_t cell_num) {
     return (uint32_t*)cell(node, cell_num);
 }
 
-void* value(void* node, uint32_t cell_num) {
-    return cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
+char* value(char* node, uint32_t cell_num) {
+    return (char*)cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
 }
 
-void init(void* node) {
+void init(char* node) {
     *num_cells(node) = 0;
 }
 
 };  // namespace LeafNode
 
-struct Row {
-    static const size_t COLUMN_USERNAME_SIZE = 32;
-    static const size_t COLUMN_EMAIL_SIZE = 255;
-    static const uint32_t ID_SIZE = sizeof(uint32_t);
-    static const uint32_t USERNAME_SIZE =
-        sizeof(char) * (COLUMN_USERNAME_SIZE + 1);
-    static const uint32_t EMAIL_SIZE = sizeof(char) * (COLUMN_EMAIL_SIZE + 1);
-
-    static const uint32_t ID_OFFSET = 0;
-    static const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
-    static const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
-    static const uint32_t SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
-
-    uint32_t id;
-    char username[COLUMN_USERNAME_SIZE + 1];
-    char email[COLUMN_EMAIL_SIZE + 1];
-
-    void serialize(void* destination) const {
-        std::memcpy((char*)destination + ID_OFFSET, &id, ID_SIZE);
-        std::memcpy((char*)destination + USERNAME_OFFSET, &username,
-                    USERNAME_SIZE);
-        std::memcpy((char*)destination + EMAIL_OFFSET, &email, EMAIL_SIZE);
-    }
-
-    void deserialize(const void* source) {
-        std::memcpy(&id, (char*)source + ID_OFFSET, ID_SIZE);
-        std::memcpy(&username, (char*)source + USERNAME_OFFSET, USERNAME_SIZE);
-        std::memcpy(&email, (char*)source + EMAIL_OFFSET, EMAIL_SIZE);
-    }
-};
-
-struct Cursor;
-
-struct Pager {
-    std::fstream file;
-    uint32_t file_length;
-    void* pages[Table::MAX_PAGES];
-
-    Pager(std::string filename)
-        : file{filename, file.in | file.out | file.trunc} {
-        if (file.fail()) {
-            printf("Unable to open file\n");
-            std::exit(EXIT_FAILURE);
-        }
-
-        file.ignore(std::numeric_limits<std::streamsize>::max());
-        file_length = file.gcount();
-
-        for (uint32_t i = 0; i < Table::MAX_PAGES; i++) {
-            pages[i] = nullptr;
-        }
-    }
-
-    void* get(uint32_t page_num) {
-        if (page_num > Table::MAX_PAGES) {
-            std::cout << "Tried to fetch page number out of bounds." << page_num
-                      << " >= " << Table::MAX_PAGES << "\n";
-            exit(EXIT_FAILURE);
-        }
-
-        if (pages[page_num] == nullptr) {
-            // Cache miss. Allocate memory and load from file.
-            void* page = new char[Table::PAGE_SIZE];
-            uint32_t num_pages = file_length / Table::PAGE_SIZE;
-
-            // We might save a partial page at the end of the file
-            if (file_length % Table::PAGE_SIZE) {
-                num_pages += 1;
-            }
-
-            if (page_num <= num_pages) {
-                file.seekg(page_num * Table::PAGE_SIZE, file.beg);
-                file.read((char*)page, Table::PAGE_SIZE);
-                if (!file.good()) {
-                    std::cout << "Error reading file: " << strerror(errno)
-                              << "\n";
-                    exit(EXIT_FAILURE);
-                }
-            }
-            pages[page_num] = page;
-        }
-
-        return pages[page_num];
-    }
-
-    void flush(uint32_t page_num, uint32_t size) {
-        if (pages[page_num] == NULL) {
-            std::cout << "Tried to flush null page\n";
-            exit(EXIT_FAILURE);
-        }
-
-        file.seekg(page_num * Table::PAGE_SIZE, file.beg);
-
-        if (!file.good()) {
-            std::cout << "Error seeking: " << strerror(errno) << "\n";
-            exit(EXIT_FAILURE);
-        }
-
-        file.write(reinterpret_cast<char*>(pages[page_num]), size);
-
-        if (!file.good()) {
-            std::cout << "Error writing: " << errno << "\n";
-            exit(EXIT_FAILURE);
-        }
-    }
-};
-
 struct Table {
-    const static size_t PAGE_SIZE = 4096;
-    const static size_t MAX_PAGES = 100;
-    const static uint32_t ROWS_PER_PAGE = PAGE_SIZE / Row::SIZE;
-    const static uint32_t MAX_ROWS = ROWS_PER_PAGE * MAX_PAGES;
+    const static uint32_t ROWS_PER_PAGE = Pager::PAGE_SIZE / Row::SIZE;
+    const static uint32_t MAX_ROWS = ROWS_PER_PAGE * Pager::MAX_PAGES;
 
     Pager pager;
     uint32_t num_rows;
@@ -223,8 +224,8 @@ struct Table {
 
         for (uint32_t i = 0; i < num_full_pages; i++) {
             if (pager.pages[i] == nullptr) continue;
-            pager.flush(i, PAGE_SIZE);
-            delete pager.pages[i];
+            pager.flush(i, Pager::PAGE_SIZE);
+            delete[] pager.pages[i];
             pager.pages[i] = nullptr;
         }
 
@@ -235,20 +236,20 @@ struct Table {
             uint32_t page_num = num_full_pages;
             if (pager.pages[page_num]) {
                 pager.flush(page_num, num_additional_rows * Row::SIZE);
-                delete pager.pages[page_num];
+                delete[] pager.pages[page_num];
                 pager.pages[page_num] = nullptr;
             }
         }
 
         pager.file.close();
-        if (pager.file.fail()) {
+        if (!pager.file) {
             std::cout << "Error closing db file.\n";
             exit(EXIT_FAILURE);
         }
-        for (uint32_t i = 0; i < Table::MAX_PAGES; i++) {
-            void* page = pager.pages[i];
+        for (uint32_t i = 0; i < Pager::MAX_PAGES; i++) {
+            char* page = pager.pages[i];
             if (page) {
-                free(page);
+                delete[] page;
                 pager.pages[i] = nullptr;
             }
         }
@@ -263,13 +264,15 @@ struct Cursor {
     Cursor(Table& table, uint32_t row_num, bool end_of_table)
         : table{table}, row_num{row_num}, end_of_table{end_of_table} {
     }
+    Cursor(Table&& table, uint32_t row_num, bool end_of_table) = delete;
 
-    void* value() {
-        uint32_t page_num = row_num / table.ROWS_PER_PAGE;
-        void* page = table.pager.get(page_num);
+    char* value() {
+        uint32_t page_num = row_num / Table::ROWS_PER_PAGE;
+
+        char* page = table.pager.get(page_num);
         uint32_t row_offset = row_num % Table::ROWS_PER_PAGE;
         uint32_t byte_offset = row_offset * Row::SIZE;
-        return (int8_t*)page + byte_offset;
+        return page + byte_offset;
     }
 
     void advance() {
@@ -281,7 +284,7 @@ struct Cursor {
 };
 
 Cursor Table::start() {
-    return Cursor{*this, 0, false};
+    return Cursor{*this, 0, num_rows == 0};
 }
 
 Cursor Table::end() {
@@ -337,10 +340,11 @@ struct Statement {
     ExecuteResult execute_select(Table& table) const {
         Row row;
         Cursor cursor = table.start();
+
         for (uint32_t i = 0; i < table.num_rows; i++) {
             row.deserialize(cursor.value());
-            std::cout << row.id << ' ' << row.username << ' ' << row.email
-                      << '\n';
+            std::cout << "(" << row.id << ", " << row.username << ", "
+                      << row.email << ")\n";
             cursor.advance();
         }
         return ExecuteResult::success;
@@ -356,9 +360,16 @@ struct Statement {
     }
 };
 
-int main() {
-    Table table("test.db");
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cout << "Must supply a database filename.\n";
+        exit(EXIT_FAILURE);
+    }
+
+    char* filename = argv[1];
+    Table table(filename);
     std::string input;
+
     while (true) {
         std::cout << "modeldb > ";
         read_input(input);
@@ -369,7 +380,10 @@ int main() {
                 case MetaCmdResult::unrecognized:
                     std::cout << "Unrecognized command \'" << input << "\'.\n";
                     continue;
+                case MetaCmdResult::exit:
+                    break;
             }
+            break;
         } else {
             Statement statement;
             switch (statement.prepare(input)) {
@@ -399,5 +413,5 @@ int main() {
             }
         }
     }
-    return EXIT_FAILURE;
+    return EXIT_SUCCESS;
 }

@@ -1,26 +1,26 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.22)
 project("modeldb")
 
 # setting version
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # add library
 file(GLOB_RECURSE MODELDB_SRC "src/*.cpp" "src/*.hpp")
-file(GLOB_RECURSE MODELDB_INCLUDE "include/*.hpp")
+file(GLOB_RECURSE MODELDB_INCLUDE "include/modeldb/*.hpp")
 add_library(modeldb SHARED ${MODELDB_SRC} ${MODELDB_INCLUDE}) 
 
 # set include directories
-target_include_directories(modeldb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/modeldb)
-target_include_directories(modeldb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# target_include_directories(modeldb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/modeldb)
+# target_include_directories(modeldb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(modeldb PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
-# add executable (repl)
 add_executable(repl "src/repl.cpp")
+target_link_libraries(repl PUBLIC modeldb)
 
 # testing
 enable_testing()

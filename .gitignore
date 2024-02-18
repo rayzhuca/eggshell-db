@@ -4,6 +4,9 @@ bin/
 libs
 _deps
 CMakeFiles
+*.cmake
+CMakeCache.txt
+Makefile
 
 # Windows
 Thumbs.db

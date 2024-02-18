@@ -7,6 +7,12 @@ We plan to add indexing, range queries, atomic transactions, concurrency, and cu
 
 Must have C++-17 installed along with CMake.
 
+Before the first build, run
+
+```zsh
+cmake -S . -B ./build 
+```
+
 To build, run
 
 ```zsh

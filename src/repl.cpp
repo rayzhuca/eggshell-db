@@ -229,8 +229,12 @@ namespace LeafNode {
 
 const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
 const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = Node::COMMON_NODE_HEADER_SIZE;
-const uint32_t LEAF_NODE_HEADER_SIZE =
-    Node::COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
+const uint32_t LEAF_NODE_NEXT_LEAF_SIZE = sizeof(uint32_t);
+const uint32_t LEAF_NODE_NEXT_LEAF_OFFSET =
+    LEAF_NODE_NUM_CELLS_OFFSET + LEAF_NODE_NUM_CELLS_SIZE;
+const uint32_t LEAF_NODE_HEADER_SIZE = Node::COMMON_NODE_HEADER_SIZE +
+                                       LEAF_NODE_NUM_CELLS_SIZE +
+                                       LEAF_NODE_NEXT_LEAF_SIZE;
 
 const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
 const uint32_t LEAF_NODE_KEY_OFFSET = 0;
@@ -263,10 +267,15 @@ char* value(char* node, uint32_t cell_num) {
     return cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
 }
 
+uint32_t* next_leaf(char* node) {
+    return (uint32_t*)(node + LEAF_NODE_NEXT_LEAF_OFFSET);
+}
+
 void init(char* node) {
     Node::set_node_type(node, NodeType::leaf);
     Node::set_node_root(node, false);
     *num_cells(node) = 0;
+    *next_leaf(node) = 0;
 }
 
 void insert(const Cursor& cursor, uint32_t key, Row& value);
@@ -282,6 +291,8 @@ void split_and_insert(const Cursor& cursor, uint32_t key, Row& value) {
     uint32_t new_page_num = cursor.table.pager.get_unused_page_num();
     char* new_node = cursor.table.pager.get(new_page_num);
     LeafNode::init(new_node);
+    *next_leaf(new_node) = *next_leaf(old_node);
+    *next_leaf(old_node) = new_page_num;
 
     /*
     All existing keys plus new key should be divided
@@ -300,7 +311,9 @@ void split_and_insert(const Cursor& cursor, uint32_t key, Row& value) {
             (char*)LeafNode::cell(destination_node, index_within_node);
 
         if (uint32_t(i) == cursor.cell_num) {
-            value.serialize(destination);
+            value.serialize(
+                LeafNode::value(destination_node, index_within_node));
+            *LeafNode::key(destination_node, index_within_node) = key;
         } else if (uint32_t(i) > cursor.cell_num) {
             memcpy(destination, LeafNode::cell(old_node, i - 1),
                    LeafNode::LEAF_NODE_CELL_SIZE);
@@ -492,9 +505,13 @@ Table::~Table() {
 }
 
 Cursor Table::start() {
-    char* root_node = pager.get(root_page_num);
-    uint32_t num_cells = *LeafNode::num_cells(root_node);
-    return Cursor{*this, root_page_num, 0, num_cells == 0};
+    Cursor cursor = find(0);
+
+    char* node = pager.get(cursor.page_num);
+    uint32_t num_cells = *LeafNode::num_cells(node);
+    cursor.end_of_table = num_cells == 0;
+
+    return cursor;
 }
 
 Cursor Table::find(uint32_t key) {
@@ -524,7 +541,15 @@ void Cursor::advance() {
     char* node = table.pager.get(page_num);
     cell_num += 1;
     if (cell_num >= *LeafNode::num_cells(node)) {
-        end_of_table = true;
+        /* Advance to next leaf node */
+        uint32_t next_page_num = *LeafNode::next_leaf(node);
+        if (next_page_num == 0) {
+            /* This was rightmost leaf */
+            end_of_table = true;
+        } else {
+            page_num = next_page_num;
+            cell_num = 0;
+        }
     }
 }
 

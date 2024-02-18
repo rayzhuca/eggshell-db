@@ -1,4 +1,4 @@
-#include "compiler/parser.hpp"
+#include "modeldb/compiler/parser.hpp"
 
 #include <iostream>
 #include <string>

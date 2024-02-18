@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <shared_mutex>
 #include <string>
 
 #include "modeldb/storage/cursor.hpp"
@@ -13,7 +14,7 @@ class Table {
    public:
     Pager pager;
     uint32_t root_page_num;
-    std::mutex mutex;
+    std::shared_mutex mutex;
 
     Table(std::string filename);
 

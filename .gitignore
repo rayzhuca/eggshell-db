@@ -19,3 +19,9 @@ desktop.ini
 .vscode
 
 notes.txt
+
+src/read.cpp
+tests/cstack.c
+tests/cstack
+tests/test.bin
+tests/test.db

@@ -7,6 +7,6 @@ jobs:
         steps:
             - run: cd ${{ github.workspace }}
             - name: Initialize cmake project in ./build
-            - run: cmake -S . -B ./build
+              run: cmake -S . -B ./build
             - name: Run cmake build
-            - run: cmake build --build
+              run: cmake build --build

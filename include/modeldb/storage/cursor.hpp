@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <mutex>
 #include <string>
 
 #include "modeldb/storage/table.hpp"

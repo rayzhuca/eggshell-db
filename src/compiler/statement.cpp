@@ -1,6 +1,7 @@
 #include "modeldb/compiler/statement.hpp"
 
 #include <cstring>
+#include <shared_mutex>
 #include <sstream>
 
 #include "modeldb/storage/bplus/leafnode.hpp"
@@ -37,6 +38,7 @@ CmdPrepareResult Statement::prepare(std::string input) {
 }
 
 ExecuteResult Statement::execute_insert(Table& table) {
+    std::unique_lock lock(table.mutex);
     char* node = table.pager.get(table.root_page_num);
     uint32_t num_cells = *LeafNode::num_cells(node);
 
@@ -55,6 +57,7 @@ ExecuteResult Statement::execute_insert(Table& table) {
 }
 
 ExecuteResult Statement::execute_select(Table& table) const {
+    std::shared_lock lock(table.mutex);
     Row row;
     Cursor cursor = table.start();
 

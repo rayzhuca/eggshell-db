@@ -9,11 +9,17 @@
 
 struct Cursor;
 
-struct Table {
+class Table {
+   public:
     Pager pager;
     uint32_t root_page_num;
+    std::mutex mutex;
+
     Table(std::string filename);
+
     ~Table();
+
     Cursor start();
+
     Cursor find(uint32_t key);
 };

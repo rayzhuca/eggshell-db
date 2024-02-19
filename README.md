@@ -1,7 +1,31 @@
 # ModelDB
 
+![workflow badge](https://github.com/RayBipse/modeldb/actions/workflows/build.yml/badge.svg)
+
 Relational database model built in C++, written as a learning project.
-We plan to add indexing, range queries, atomic transactions, concurrency, and custom parser, with everything built from scratch.
+
+ModelDB could support concurrent read and write operations. It utilizes a readers-writer lock.
+
+It could also support atomicity, as previous pages are logged before they are modified.
+
+The project includes two basic SQL commands,
+
+```SQL
+INSERT INTO table_name VALUES (value1, value2, ...);
+```
+
+```SQL
+SELECT column1, column2 FROM table_name;
+```
+
+
+## Architecture
+
+The library is broken down into two sections, ``compiler`` and ``storage``, where the ``compiler`` composes inputs into
+commands and ``storage`` is responsible for storing data.
+
+![toydb architecture](https://github.com/RayBipse/modeldb/assets/46636772/58b72c59-f472-4196-996e-73b286745e36)
+
 
 ## Usage
 
@@ -19,11 +43,21 @@ To build, run
 cmake --build build
 ```
 
-To run the REPL,
+To run the REPL, first create an empty file, e.g., ``touch example.db``, then run
 
 ```zsh
-build/repl
+build/repl example.db
 ```
+
+
+## Future features
+
+Some features to be implemented in the future are
+- ``JOIN`` clauses
+- Immutable B+ tree for complete atomic transactions
+- Distributed database
+- Error system (for now, we are just using ``exit`` on failure)
+
 
 ## Tests
 
@@ -60,3 +94,24 @@ For VSCode, ``c_cpp_properties.json`` should have something like the following
     ]
 }
 ```
+
+
+## Resources and credits
+
+As someone who had no previous knowledge of databases, I have used numerous resources for this project that I would love to share.
+
+##### Good project examples
+
+[Let's Build a Simple Database (C)](https://cstack.github.io/db_tutorial/)
+
+[Build Your Own Database From Scratch (Go)](https://cstack.github.io/db_tutorial/)
+
+[toyDB (Rust)](https://github.com/erikgrinaker/toydb/blob/master/README.md)
+
+##### General database theory
+
+[CMU Database Group](https://youtu.be/DJ5u5HrbcMk?si=tMYnMY950OVwwrhH)
+
+##### Parser 
+
+[Cornell Introduction to Compiler](https://www.cs.cornell.edu/courses/cs4120/2023sp/)

@@ -1,4 +1,4 @@
-# <img width="40" valign="top" alt="Screenshot 2024-02-18 at 4 57 57 PM" src="https://github.com/RayBipse/eggshell-db/assets/46636772/d95263e6-8ef0-439d-8fd8-2028306f2421"> Eggshell DB
+# <img width="40" valign="top" alt="Screenshot 2024-02-18 at 4 57 57 PM" src="https://github.com/RayBipse/eggshell-db/assets/46636772/d95263e6-8ef0-439d-8fd8-2028306f2421"> eggshell db
 
 ![workflow badge](https://github.com/RayBipse/eggshell-db/actions/workflows/build.yml/badge.svg)
 

@@ -1,8 +1,8 @@
 #include <exception>
 #include <iostream>
-#include <modeldb/compiler/metacmd/metacmd.hpp>
-#include <modeldb/compiler/statement.hpp>
-#include <modeldb/storage/table.hpp>
+#include <eggshell/compiler/metacmd/metacmd.hpp>
+#include <eggshell/compiler/statement.hpp>
+#include <eggshell/storage/table.hpp>
 #include <string>
 
 void read_input(std::string& str) {
@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
     std::string input;
 
     while (true) {
-        std::cout << "modeldb > ";
+        std::cout << "eggshell > ";
         read_input(input);
         if (input[0] == '.') {
             switch (do_meta_cmd(input, table)) {

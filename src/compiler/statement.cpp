@@ -1,10 +1,10 @@
-#include "modeldb/compiler/statement.hpp"
+#include "eggshell/compiler/statement.hpp"
 
 #include <cstring>
 #include <shared_mutex>
 #include <sstream>
 
-#include "modeldb/storage/bplus/leafnode.hpp"
+#include "eggshell/storage/bplus/leafnode.hpp"
 
 CmdPrepareResult Statement::prepare(std::string input) {
     if (input.starts_with("insert")) {

@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "modeldb/storage/cursor.hpp"
-#include "modeldb/storage/row.hpp"
+#include "eggshell/storage/cursor.hpp"
+#include "eggshell/storage/row.hpp"
 
 namespace LeafNode {
 

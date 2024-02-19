@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "modeldb/compiler/executeresult.hpp"
-#include "modeldb/compiler/prepareresult.hpp"
-#include "modeldb/storage/row.hpp"
-#include "modeldb/storage/table.hpp"
+#include "eggshell/compiler/executeresult.hpp"
+#include "eggshell/compiler/prepareresult.hpp"
+#include "eggshell/storage/row.hpp"
+#include "eggshell/storage/table.hpp"
 
 enum class StatementType { insert, select };
 

@@ -5,7 +5,7 @@
 #include <mutex>
 #include <string>
 
-#include "modeldb/storage/table.hpp"
+#include "eggshell/storage/table.hpp"
 
 struct Table;
 

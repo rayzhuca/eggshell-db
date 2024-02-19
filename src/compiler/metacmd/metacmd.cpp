@@ -1,12 +1,12 @@
-#include "modeldb/compiler/metacmd/metacmd.hpp"
+#include "eggshell/compiler/metacmd/metacmd.hpp"
 
 #include <iostream>
 
-#include "modeldb/compiler/metacmd/metacmdresult.hpp"
-#include "modeldb/storage/bplus/internalnode.hpp"
-#include "modeldb/storage/bplus/leafnode.hpp"
-#include "modeldb/storage/bplus/node.hpp"
-#include "modeldb/storage/row.hpp"
+#include "eggshell/compiler/metacmd/metacmdresult.hpp"
+#include "eggshell/storage/bplus/internalnode.hpp"
+#include "eggshell/storage/bplus/leafnode.hpp"
+#include "eggshell/storage/bplus/node.hpp"
+#include "eggshell/storage/row.hpp"
 
 void print_constants() {
     printf("ROW_SIZE: %d\n", Row::SIZE);

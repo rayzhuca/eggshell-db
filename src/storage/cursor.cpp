@@ -1,6 +1,6 @@
-#include "modeldb/storage/cursor.hpp"
+#include "eggshell/storage/cursor.hpp"
 
-#include "modeldb/storage/bplus/leafnode.hpp"
+#include "eggshell/storage/bplus/leafnode.hpp"
 
 Cursor::Cursor(Table& table, uint32_t page_num, uint32_t cell_num,
                bool end_of_table)

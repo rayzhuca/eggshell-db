@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "modeldb/storage/table.hpp"
+#include "eggshell/storage/table.hpp"
 
 namespace InternalNode {
 

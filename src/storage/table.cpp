@@ -1,10 +1,10 @@
-#include "modeldb/storage/table.hpp"
+#include "eggshell/storage/table.hpp"
 
 #include <fstream>
 
-#include "modeldb/storage/bplus/internalnode.hpp"
-#include "modeldb/storage/bplus/leafnode.hpp"
-#include "modeldb/storage/bplus/node.hpp"
+#include "eggshell/storage/bplus/internalnode.hpp"
+#include "eggshell/storage/bplus/leafnode.hpp"
+#include "eggshell/storage/bplus/node.hpp"
 
 Table::Table(std::string filename) : pager{filename}, root_page_num{0} {
     if (pager.num_pages == 0) {

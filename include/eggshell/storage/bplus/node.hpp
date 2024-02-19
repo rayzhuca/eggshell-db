@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
-#include "modeldb/storage/bplus/nodetype.hpp"
-#include "modeldb/storage/cursor.hpp"
-#include "modeldb/storage/table.hpp"
+#include "eggshell/storage/bplus/nodetype.hpp"
+#include "eggshell/storage/cursor.hpp"
+#include "eggshell/storage/table.hpp"
 
 namespace Node {
 

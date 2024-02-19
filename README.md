@@ -1,10 +1,10 @@
-# ModelDB
+# Eggshell DB
 
-![workflow badge](https://github.com/RayBipse/modeldb/actions/workflows/build.yml/badge.svg)
+![workflow badge](https://github.com/RayBipse/eggshell-db/actions/workflows/build.yml/badge.svg)
 
 Relational database model built in C++, written as a learning project.
 
-ModelDB could support concurrent read and write operations. It utilizes a readers-writer lock.
+Eggshell could support concurrent read and write operations. It utilizes a readers-writer lock.
 
 It could also support atomicity, as previous pages are logged before they are modified.
 
@@ -24,7 +24,7 @@ SELECT column1, column2 FROM table_name;
 The library is broken down into two sections, ``compiler`` and ``storage``, where the ``compiler`` composes inputs into
 commands and ``storage`` is responsible for storing data.
 
-![toydb architecture](https://github.com/RayBipse/modeldb/assets/46636772/58b72c59-f472-4196-996e-73b286745e36)
+![toydb architecture](https://github.com/RayBipse/eggshell/assets/46636772/58b72c59-f472-4196-996e-73b286745e36)
 
 
 ## Usage
@@ -61,7 +61,7 @@ Some features to be implemented in the future are
 
 ## Tests
 
-ModelDB uses [Google Test](https://github.com/google/googletest), which is simple to configure and run.
+eggshell uses [Google Test](https://github.com/google/googletest), which is simple to configure and run.
 To test, run the following command after building:
 
 ```zsh

@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <string>
 
-#include "modeldb/compiler/metacmd/metacmdresult.hpp"
-#include "modeldb/storage/pager.hpp"
-#include "modeldb/storage/table.hpp"
+#include "eggshell/compiler/metacmd/metacmdresult.hpp"
+#include "eggshell/storage/pager.hpp"
+#include "eggshell/storage/table.hpp"
 
 void print_constants();
 

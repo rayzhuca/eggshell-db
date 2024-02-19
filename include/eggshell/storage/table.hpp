@@ -5,8 +5,8 @@
 #include <shared_mutex>
 #include <string>
 
-#include "modeldb/storage/cursor.hpp"
-#include "modeldb/storage/pager.hpp"
+#include "eggshell/storage/cursor.hpp"
+#include "eggshell/storage/pager.hpp"
 
 struct Cursor;
 

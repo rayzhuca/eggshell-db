@@ -1,8 +1,8 @@
-#include "modeldb/storage/bplus/internalnode.hpp"
+#include "eggshell/storage/bplus/internalnode.hpp"
 
-#include "modeldb/storage/bplus/leafnode.hpp"
-#include "modeldb/storage/bplus/node.hpp"
-#include "modeldb/storage/cursor.hpp"
+#include "eggshell/storage/bplus/leafnode.hpp"
+#include "eggshell/storage/bplus/node.hpp"
+#include "eggshell/storage/cursor.hpp"
 
 /*
  * Internal Node Header Layout

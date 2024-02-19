@@ -1,4 +1,4 @@
-# Eggshell DB
+# <img width="40" valign="top" alt="Screenshot 2024-02-18 at 4 57 57 PM" src="https://github.com/RayBipse/eggshell-db/assets/46636772/d95263e6-8ef0-439d-8fd8-2028306f2421"> Eggshell DB
 
 ![workflow badge](https://github.com/RayBipse/eggshell-db/actions/workflows/build.yml/badge.svg)
 
@@ -24,7 +24,7 @@ SELECT column1, column2 FROM table_name;
 The library is broken down into two sections, ``compiler`` and ``storage``, where the ``compiler`` composes inputs into
 commands and ``storage`` is responsible for storing data.
 
-![toydb architecture](https://github.com/RayBipse/eggshell/assets/46636772/58b72c59-f472-4196-996e-73b286745e36)
+![toydb architecture (1)](https://github.com/RayBipse/eggshell-db/assets/46636772/1d4dd79e-6d65-4afa-a110-ab685f92ed6a)
 
 
 ## Usage
